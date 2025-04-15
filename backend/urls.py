@@ -22,6 +22,6 @@ urlpatterns = [
 # Helps reduce exposure to automated bot scans and brute-force attempts targeting '/admin/'.
     path('admin-expense/', admin.site.urls),
     path('api/', include('users.urls')),
-    path('api/categories/', include('categories.urls')),  # 👈 Plug it in here
-
+    path('api/categories/', include('categories.urls')),
+    path('api/expenses/', include('expenses.urls')),
 ]
