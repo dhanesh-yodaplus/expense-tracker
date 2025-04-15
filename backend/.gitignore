@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+# Virtualenv
+env/
+venv/
+.venv/
+
+# VS Code
+.vscode/
+
+# Django secret config
+.env
+
+# Migrations (optional)
+*/migrations/
+!*/migrations/__init__.py
