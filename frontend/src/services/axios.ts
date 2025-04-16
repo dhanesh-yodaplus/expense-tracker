@@ -1,24 +1,24 @@
-import axios from 'axios';
-import { refreshAccessToken } from './auth';
+import axios from "axios";
+import { refreshAccessToken } from "./auth";
 
 // Base URL for API requests
-const BASE_URL = 'http://localhost:8000/api';
+const BASE_URL = "http://localhost:8000/api";
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 // Request interceptor to attach access token
 axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  console.log('[AXIOS DEBUG] Access Token:', token);
+  const token = localStorage.getItem("access_token");
+  //   console.log('[AXIOS DEBUG] Access Token:', token);
 
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log('[AXIOS DEBUG] Authorization Header Set:', config.headers);
+    // console.log('[AXIOS DEBUG] Authorization Header Set:', config.headers);
   }
 
   return config;
@@ -36,10 +36,14 @@ axiosInstance.interceptors.response.use(
 
       const newAccessToken = await refreshAccessToken();
       if (newAccessToken) {
-        // Update headers with new token
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        return axiosInstance(originalRequest); // Retry the original request
+        originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
+        return axiosInstance(originalRequest);
       }
+
+      // Refresh token is invalid: force logout
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/"; // or navigate("/login")
     }
 
     return Promise.reject(error);

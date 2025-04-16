@@ -1,10 +1,17 @@
 import React from "react";
 import { useForm } from "react-hook-form";
 import axiosInstance from "../services/axios";
-import {TextField,Button,Box,Typography,Container,Alert} from "@mui/material";
+import {
+  TextField,
+  Button,
+  Box,
+  Typography,
+  Container,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { Link } from 'react-router-dom';
-
+import { Link } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 type LoginFormInputs = {
   email: string;
@@ -18,7 +25,6 @@ export default function Login() {
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormInputs>();
-  const [error, setError] = React.useState<string | null>(null);
 
   const onSubmit = async (data: LoginFormInputs) => {
     try {
@@ -26,19 +32,35 @@ export default function Login() {
       const { access, refresh } = response.data;
       localStorage.setItem("access_token", access);
       localStorage.setItem("refresh_token", refresh);
-      navigate("/dashboard");
+
+      toast.success("Login successful! Redirecting...");
+      setTimeout(() => navigate("/dashboard"), 2000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Login failed");
+      const detail = err.response?.data?.detail || "Login failed";
+      toast.error(detail);
     }
   };
 
   return (
     <Container maxWidth="sm">
-      <Box sx={{ mt: 8, p: 4, boxShadow: 3, borderRadius: 2 }}>
+      <ToastContainer position="top-right" autoClose={2000}  aria-label="Login"/>
+      <Box
+  sx={(theme) => ({
+    mt: 8,
+    p: 4,
+    borderRadius: 3,
+    backgroundColor: theme.palette.background.paper,
+    boxShadow:
+      theme.palette.mode === "dark"
+        ? "0 2px 12px rgba(0,0,0,0.7)"
+        : "0 2px 10px rgba(0,0,0,0.1)",
+    border: theme.palette.mode === "dark" ? "1px solid #2a2d35" : "none",
+  })}
+>
         <Typography variant="h4" gutterBottom>
           Login
         </Typography>
-        {error && <Alert severity="error">{error}</Alert>}
+
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <TextField
             label="Email"

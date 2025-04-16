@@ -48,7 +48,9 @@ export default function AddExpenseForm({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await axiosInstance.get<Category[]>("/categories/?type=expense");
+        const res = await axiosInstance.get<Category[]>(
+          "/categories/?type=expense"
+        );
         setCategories(res.data);
         if (res.data.length > 0) {
           setValue("category", res.data[0].id.toString());
@@ -64,20 +66,35 @@ export default function AddExpenseForm({ onClose }: { onClose: () => void }) {
     fetchCategories();
   }, [setValue]);
 
+  const [submitting, setSubmitting] = useState(false);
+
   const onSubmit = async (data: FormData) => {
+    setSubmitting(true);
+  
+    const payload = {
+      ...data,
+      category_id: parseInt(data.category)
+ // ensure it's a number
+    };
+  
+    console.log("Submitting data:", payload); // log for debugging
+  
     try {
-      await axiosInstance.post("/expenses/", data);
+      await axiosInstance.post("/expenses/", payload);
       setSuccess(true);
       reset();
       setTimeout(() => {
         setSuccess(false);
         onClose();
       }, 1500);
-    } catch (err) {
-      console.error("Submit error:", err);
+    } catch {
       setError("Failed to add expense.");
+    } finally {
+      setSubmitting(false);
     }
   };
+  
+  
 
   return (
     <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 2 }}>
@@ -105,7 +122,6 @@ export default function AddExpenseForm({ onClose }: { onClose: () => void }) {
 
       <TextField
         fullWidth
-        // label="Date"
         type="date"
         margin="normal"
         {...register("date")}
@@ -140,8 +156,17 @@ export default function AddExpenseForm({ onClose }: { onClose: () => void }) {
         {...register("notes")}
       />
 
-      <Button variant="contained" type="submit" sx={{ mt: 2 }}>
-        Submit
+      <Button
+        variant="contained"
+        type="submit"
+        sx={{ mt: 2 }}
+        disabled={loading || submitting}
+        style={{
+          opacity: loading || submitting ? 0.6 : 1,
+          pointerEvents: loading || submitting ? "none" : "auto",
+        }}
+      >
+        {submitting ? "Submitting..." : "Submit"}
       </Button>
     </Box>
   );

@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   TextField,
   Button,
@@ -12,9 +12,10 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axiosInstance from "../services/axios";
-import { useNavigate } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-// ✅ Zod schema without role
+// Zod schema without role
 const registerSchema = z
   .object({
     email: z.string().email({ message: "Invalid email address" }),
@@ -33,9 +34,6 @@ type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function Register() {
   const navigate = useNavigate();
-  const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState<boolean>(false);
-
   const {
     register,
     handleSubmit,
@@ -46,7 +44,7 @@ export default function Register() {
 
   const onSubmit = async (data: RegisterForm) => {
     try {
-      const response = await axiosInstance.post("/register/", {
+      await axiosInstance.post("/register/", {
         email: data.email,
         username: data.username,
         first_name: data.first_name,
@@ -54,30 +52,34 @@ export default function Register() {
         password: data.password,
         confirm_password: data.confirm_password,
       });
-      setSuccess(true);
-      setTimeout(() => navigate("/"), 1500);
+
+      toast.success("Registered successfully! Redirecting to login...");
+      setTimeout(() => navigate("/"), 2000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Registration failed");
+      const detail = err.response?.data?.detail || "Registration failed";
+      toast.error(detail);
     }
   };
 
   return (
     <Container maxWidth="sm">
-      <Box sx={{ mt: 8, p: 4, boxShadow: 3, borderRadius: 2 }}>
+      <ToastContainer position="top-right" autoClose={2000} aria-label="Notification" />
+      <Box
+        sx={(theme) => ({
+          mt: 8,
+          p: 4,
+          borderRadius: 3,
+          backgroundColor: theme.palette.background.paper,
+          boxShadow:
+            theme.palette.mode === "dark"
+              ? "0 2px 12px rgba(0,0,0,0.7)"
+              : "0 2px 10px rgba(0,0,0,0.1)",
+          border: theme.palette.mode === "dark" ? "1px solid #2a2d35" : "none",
+        })}
+      >
         <Typography variant="h4" gutterBottom>
           Register
         </Typography>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-        {success && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            Registered successfully! Redirecting...
-          </Alert>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <TextField
@@ -139,6 +141,7 @@ export default function Register() {
           <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>
             Register
           </Button>
+
           <Box mt={2} textAlign="center">
             Already registered?{" "}
             <Link
