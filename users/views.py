@@ -4,7 +4,7 @@ from rest_framework import status
 from .serializers import RegisterSerializer, LoginSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 import logging
 
 User = get_user_model()
@@ -14,7 +14,7 @@ class RegisterView(APIView):
     API endpoint for user registration.
     Accepts email, username, password, and role.
     """
-
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
@@ -29,7 +29,7 @@ class LoginView(APIView):
     Authenticates email and password using serializer.
     Returns JWT access and refresh tokens on success.
     """
-
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():

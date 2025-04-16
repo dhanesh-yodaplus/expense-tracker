@@ -19,25 +19,49 @@ class UserSerializer(serializers.ModelSerializer):
 class RegisterSerializer(serializers.ModelSerializer):
     """
     Serializer for handling user registration.
-    Validates input fields and creates a new user using create_user().
+    Includes validations for email, names, and password confirmation.
     """
 
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+    email = serializers.EmailField()
 
     class Meta:
         model = User
-        fields = ['email', 'username', 'password', 'role']
+        fields = [
+            'email',
+            'username',
+            'password',
+            'confirm_password',
+            'first_name',
+            'last_name',
+        ]
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email is already registered.")
+        return value
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Username already taken.")
+        return value
+
+    def validate(self, data):
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError("Passwords do not match.")
+        return data
 
     def create(self, validated_data):
-        """
-        Create a new user instance after validating data.
-        Uses Django's built-in create_user method for password hashing.
-        """
+        validated_data.pop('confirm_password')
+
         user = User.objects.create_user(
             email=validated_data['email'],
             username=validated_data['username'],
             password=validated_data['password'],
-            role=validated_data.get('role', 'user')
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            role='user',
         )
         return user
 
