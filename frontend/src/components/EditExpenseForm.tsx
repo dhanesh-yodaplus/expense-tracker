@@ -62,7 +62,7 @@ export default function EditExpenseForm({ expense, onCancel, onSave }: Props) {
     // Convert to correct API payload
     onSave({
       ...formData,
-      category_id: formData.category, // ✅ this is important
+      category_id: formData.category,
     });
   };
 
