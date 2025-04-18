@@ -3,11 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Sum
 from datetime import datetime
-from .models import Budget
-from .serializers import BudgetSerializer
+from .models import Budget, MonthlyBudget
+from .serializers import BudgetSerializer, MonthlyBudgetSerializer
 from expenses.models import Expense
-from .models import MonthlyBudget
-from .serializers import MonthlyBudgetSerializer
+
 
 class BudgetViewSet(viewsets.ModelViewSet):
     """
@@ -19,15 +18,9 @@ class BudgetViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        """
-        Return budgets for the current user, ordered by month (desc).
-        """
         return Budget.objects.filter(user=self.request.user).order_by('-month')
 
     def perform_create(self, serializer):
-        """
-        Set the user automatically when a budget is created.
-        """
         serializer.save(user=self.request.user)
 
     @action(detail=False, methods=['get'], url_path='summary')
@@ -55,7 +48,6 @@ class BudgetViewSet(viewsets.ModelViewSet):
                 date__year=month_start.year,
                 date__month=month_start.month
             )
-
             spent = expenses.aggregate(total=Sum('amount'))['total'] or 0
             spent = float(spent)
             budget_amount = float(budget.amount)
@@ -83,25 +75,6 @@ class BudgetViewSet(viewsets.ModelViewSet):
 
         return Response(results, status=status.HTTP_200_OK)
 
-class MonthlyBudgetViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet to manage the overall monthly budget cap.
-    """
-    queryset = MonthlyBudget.objects.all()  # ✅ This line is REQUIRED
-    serializer_class = MonthlyBudgetSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        if self.request.user and self.request.user.is_authenticated:
-            return MonthlyBudget.objects.filter(user=self.request.user).order_by('-month')
-        return MonthlyBudget.objects.none()
-
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-# views.py
-
     @action(detail=False, methods=['get'], url_path='by-month')
     def get_budgets_by_month(self, request):
         """
@@ -126,3 +99,20 @@ class MonthlyBudgetViewSet(viewsets.ModelViewSet):
         budgets = Budget.objects.filter(user=request.user, month=month_start)
         serializer = BudgetSerializer(budgets, many=True)
         return Response(serializer.data)
+
+
+class MonthlyBudgetViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet to manage the overall monthly budget cap.
+    """
+    queryset = MonthlyBudget.objects.all()
+    serializer_class = MonthlyBudgetSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user and self.request.user.is_authenticated:
+            return MonthlyBudget.objects.filter(user=self.request.user).order_by('-month')
+        return MonthlyBudget.objects.none()
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

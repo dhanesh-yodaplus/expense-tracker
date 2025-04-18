@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   CircularProgress,
   Alert,
@@ -16,101 +16,158 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  Box,
+  Typography,
+  TableSortLabel,
+  InputAdornment,
+  TextField,
+  Button,
+  useTheme,
+  Chip,
 } from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon,
+  FilterList as FilterIcon,
+} from "@mui/icons-material";
 import axiosInstance from "../services/axios";
 import EditExpenseForm from "./EditExpenseForm";
+import dayjs from "dayjs";
+import CloseIcon from "@mui/icons-material/Close";
 
-type Expense = {
+interface Category {
+  id: number;
+  name: string;
+}
+
+interface Expense {
   id: number;
   title: string;
   amount: number;
   date: string;
-  category: { id: number; name: string }; // Include id for mapping
+  category: Category;
   notes?: string;
+}
+
+type SortableKey = keyof Pick<Expense, "amount" | "date">;
+
+interface SortConfig {
+  key: SortableKey;
+  direction: "asc" | "desc";
+}
+
+interface CategoryOption {
+  id: number;
+  name: string;
+}
+
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
 };
 
-type SortableKeys = "amount" | "date";
-
-type SortConfig = {
-  key: SortableKeys;
-  direction: "asc" | "desc";
+const formatDate = (dateString: string): string => {
+  return dayjs(dateString).format("DD MMM YYYY");
 };
 
 export default function ExpenseList() {
+  const theme = useTheme();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
-  const [allCategories, setAllCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [editOpen, setEditOpen] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<number | "">("");
+  const [editOpen, setEditOpen] = useState<boolean>(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   useEffect(() => {
-    const fetchExpenses = async () => {
+    const fetchData = async () => {
       try {
-        const res = await axiosInstance.get("/expenses/");
-        const sorted = res.data.sort(
-          (a: Expense, b: Expense) =>
-            new Date(b.date).getTime() - new Date(a.date).getTime()
+        const [expensesRes, categoriesRes] = await Promise.all([
+          axiosInstance.get<Expense[]>("/expenses/"),
+          axiosInstance.get<Category[]>("/categories/?type=expense"),
+        ]);
+
+        const sortedExpenses = [...expensesRes.data].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
         );
-        setExpenses(sorted);
-      } catch {
-        setError("Failed to load expenses.");
+
+        setExpenses(sortedExpenses);
+        setCategoryOptions(categoriesRes.data);
+      } catch (err) {
+        setError("Failed to load data. Please try again later.");
       } finally {
         setLoading(false);
       }
     };
 
-    const fetchCategories = async () => {
-      try {
-        const res = await axiosInstance.get("/categories/?type=expense");
-        const categoryNames = res.data.map((cat: { name: string }) => cat.name);
-        setAllCategories(categoryNames);
-      } catch {
-        console.error("Failed to load categories");
-      }
-    };
-
-    fetchExpenses();
-    fetchCategories();
+    fetchData();
   }, []);
 
-  const handleSort = (key: SortableKeys) => {
+  const handleSort = (key: SortableKey) => {
     let direction: "asc" | "desc" = "asc";
     if (sortConfig?.key === key && sortConfig.direction === "asc") {
       direction = "desc";
     }
-
-    const sortedExpenses = [...expenses].sort((a, b) => {
-      if (key === "amount") {
-        return direction === "asc" ? a.amount - b.amount : b.amount - a.amount;
-      }
-
-      if (key === "date") {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return direction === "asc" ? dateA - dateB : dateB - dateA;
-      }
-
-      return 0;
-    });
-
-    setExpenses(sortedExpenses);
     setSortConfig({ key, direction });
   };
 
+  const sortedExpenses = useMemo(() => {
+    if (!sortConfig) return expenses;
+
+    return [...expenses].sort((a, b) => {
+      if (sortConfig.key === "amount") {
+        return sortConfig.direction === "asc"
+          ? a.amount - b.amount
+          : b.amount - a.amount;
+      } else {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return sortConfig.direction === "asc" ? dateA - dateB : dateB - dateA;
+      }
+    });
+  }, [expenses, sortConfig]);
+
+  const filteredExpenses = useMemo(() => {
+    let result = sortedExpenses;
+
+    if (selectedCategory) {
+      result = result.filter((exp) => exp.category.id === selectedCategory);
+    }
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(
+        (exp) =>
+          exp.title.toLowerCase().includes(term) ||
+          exp.category.name.toLowerCase().includes(term) ||
+          (exp.notes && exp.notes.toLowerCase().includes(term))
+      );
+    }
+
+    return result;
+  }, [sortedExpenses, selectedCategory, searchTerm]);
+
   const handleUpdateExpense = async (updated: Expense) => {
     try {
-      const res = await axiosInstance.put(`/expenses/${updated.id}/`, updated);
+      const { data } = await axiosInstance.put<Expense>(
+        `/expenses/${updated.id}/`,
+        updated
+      );
       setExpenses((prev) =>
-        prev.map((exp) => (exp.id === updated.id ? res.data : exp))
+        prev.map((exp) => (exp.id === updated.id ? data : exp))
       );
       setEditOpen(false);
     } catch (err) {
       console.error("Failed to update expense", err);
+      setError("Failed to update expense. Please try again.");
     }
   };
 
@@ -120,96 +177,225 @@ export default function ExpenseList() {
       setExpenses((prev) => prev.filter((exp) => exp.id !== id));
     } catch (err) {
       console.error("Failed to delete expense", err);
+      setError("Failed to delete expense. Please try again.");
     }
   };
 
-  const visibleExpenses = selectedCategory
-    ? expenses.filter((e) => e.category?.name === selectedCategory)
-    : expenses;
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" mt={4}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-  if (loading) return <CircularProgress sx={{ mt: 4 }} />;
-  if (error) return <Alert severity="error">{error}</Alert>;
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ mt: 2 }}>
+        {error}
+      </Alert>
+    );
+  }
 
   return (
-    <>
-      <FormControl variant="outlined" size="small" sx={{ minWidth: 220, mb: 2 }}>
-        <Select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          displayEmpty
-          renderValue={(selected) =>
-            selected === "" ? "Filter by Category" : selected
-          }
-        >
-          <MenuItem value="">
-            <em>All</em>
-          </MenuItem>
-          {allCategories.map((cat) => (
-            <MenuItem key={cat} value={cat}>
-              {cat}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+    <Box sx={{ overflow: "auto" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+          flexWrap: "wrap",
+          gap: 2,
+        }}
+      >
+        <Typography variant="h5" component="h2" fontWeight={600}>
+          Expense Records
+        </Typography>
 
-      <TableContainer component={Paper}>
-        <Table>
+        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <TextField
+            size="small"
+            placeholder="Search expenses..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ minWidth: 250 }}
+          />
+
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <Select
+              value={selectedCategory}
+              onChange={(e) =>
+                setSelectedCategory(
+                  e.target.value === "" ? "" : Number(e.target.value)
+                )
+              }
+              displayEmpty
+              renderValue={(selected) =>
+                selected === "" ? (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <FilterIcon fontSize="small" />
+                    <Typography>Filter by Category</Typography>
+                  </Box>
+                ) : (
+                  categoryOptions.find((cat) => cat.id === selected)?.name
+                )
+              }
+            >
+              <MenuItem value="">
+                <em>All Categories</em>
+              </MenuItem>
+              {categoryOptions.map((cat) => (
+                <MenuItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+      </Box>
+
+      <TableContainer component={Paper} elevation={2}>
+        <Table sx={{ minWidth: 750 }} aria-label="expenses table">
           <TableHead>
             <TableRow>
               <TableCell>Title</TableCell>
-              <TableCell
-                onClick={() => handleSort("amount")}
-                style={{ cursor: "pointer" }}
-              >
-                Amount {sortConfig?.key === "amount" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+              <TableCell sortDirection={sortConfig?.key === "amount" ? sortConfig.direction : false}>
+                <TableSortLabel
+                  active={sortConfig?.key === "amount"}
+                  direction={sortConfig?.key === "amount" ? sortConfig.direction : "asc"}
+                  onClick={() => handleSort("amount")}
+                >
+                  Amount
+                </TableSortLabel>
               </TableCell>
-              <TableCell
-                onClick={() => handleSort("date")}
-                style={{ cursor: "pointer" }}
-              >
-                Date {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+              <TableCell sortDirection={sortConfig?.key === "date" ? sortConfig.direction : false}>
+                <TableSortLabel
+                  active={sortConfig?.key === "date"}
+                  direction={sortConfig?.key === "date" ? sortConfig.direction : "asc"}
+                  onClick={() => handleSort("date")}
+                >
+                  Date
+                </TableSortLabel>
               </TableCell>
               <TableCell>Category</TableCell>
               <TableCell>Notes</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {visibleExpenses.map((exp) => (
-              <TableRow key={exp.id}>
-                <TableCell>{exp.title}</TableCell>
-                <TableCell>₹ {exp.amount}</TableCell>
-                <TableCell>{new Date(exp.date).toLocaleDateString("en-IN")}</TableCell>
-                <TableCell>{exp.category?.name || "-"}</TableCell>
-                <TableCell>{exp.notes || "-"}</TableCell>
-                <TableCell>
-                  <IconButton onClick={() => { setEditingExpense(exp); setEditOpen(true); }}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton color="error" onClick={() => handleDeleteExpense(exp.id)}>
-                    <DeleteIcon />
-                  </IconButton>
+            {filteredExpenses.length > 0 ? (
+              filteredExpenses.map((exp) => (
+                <TableRow key={exp.id} hover>
+                  <TableCell>{exp.title}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={formatCurrency(exp.amount)}
+                      color={
+                        exp.amount > 5000
+                          ? "error"
+                          : exp.amount > 2000
+                          ? "warning"
+                          : "default"
+                      }
+                      size="small"
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>{formatDate(exp.date)}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={exp.category.name}
+                      size="small"
+                      sx={{ backgroundColor: theme.palette.action.hover }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        maxWidth: 200,
+                      }}
+                    >
+                      {exp.notes || "-"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    <IconButton
+                      onClick={() => {
+                        setEditingExpense(exp);
+                        setEditOpen(true);
+                      }}
+                      color="primary"
+                      size="small"
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      color="error"
+                      onClick={() => handleDeleteExpense(exp.id)}
+                      size="small"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <Typography color="text.secondary">
+                    {searchTerm || selectedCategory
+                      ? "No matching expenses found"
+                      : "No expenses recorded yet"}
+                  </Typography>
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* Dialog now uses extracted EditExpenseForm */}
-      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Expense</DialogTitle>
-        <DialogContent>
+      <Dialog
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogTitle>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Typography variant="h6">Edit Expense</Typography>
+            <IconButton onClick={() => setEditOpen(false)} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
           {editingExpense && (
             <EditExpenseForm
               expense={editingExpense}
+              categories={categoryOptions}
               onCancel={() => setEditOpen(false)}
               onSave={handleUpdateExpense}
             />
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </Box>
   );
 }
-
