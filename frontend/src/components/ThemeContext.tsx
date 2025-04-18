@@ -5,18 +5,29 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import { ThemeProvider, createTheme, CssBaseline, useMediaQuery } from "@mui/material";
+import {
+  ThemeProvider,
+  createTheme,
+  CssBaseline,
+  useMediaQuery,
+} from "@mui/material";
 import { deepmerge } from "@mui/utils";
 
 type ThemeMode = "light" | "dark";
 
-const ThemeModeContext = createContext({
+interface ThemeContextValue {
+  toggleTheme: () => void;
+  mode: ThemeMode;
+}
+
+const ThemeModeContext = createContext<ThemeContextValue>({
   toggleTheme: () => {},
-  mode: "light" as ThemeMode,
+  mode: "light",
 });
 
-export const useThemeMode = () => useContext(ThemeModeContext);
+export const useThemeMode = (): ThemeContextValue => useContext(ThemeModeContext);
 
+// Base theme configuration
 const baseTheme = createTheme({
   shape: {
     borderRadius: 12,
@@ -81,6 +92,7 @@ const baseTheme = createTheme({
   },
 });
 
+// Light theme configuration
 const lightTheme = deepmerge(baseTheme, {
   palette: {
     mode: 'light',
@@ -115,6 +127,7 @@ const lightTheme = deepmerge(baseTheme, {
   },
 });
 
+// Enhanced greyish dark theme
 const darkTheme = deepmerge(baseTheme, {
   palette: {
     mode: 'dark',
@@ -127,32 +140,64 @@ const darkTheme = deepmerge(baseTheme, {
       contrastText: '#ffffff',
     },
     background: {
-      default: '#121212',
-      paper: '#1e1e1e',
+      default: '#1a1a1a',  // Dark grey instead of pure black
+      paper: '#2d2d2d',    // Slightly lighter grey for surfaces
     },
     text: {
       primary: '#e0e0e0',
-      secondary: '#a0a0a0',
-      disabled: '#5a5a5a',
+      secondary: '#b0b0b0', // Brighter secondary text for better readability
+      disabled: '#7a7a7a',
     },
     divider: 'rgba(255, 255, 255, 0.12)',
+    action: {
+      active: '#ffffff',
+      hover: 'rgba(255, 255, 255, 0.08)',
+      selected: 'rgba(255, 255, 255, 0.16)',
+      disabled: 'rgba(255, 255, 255, 0.3)',
+      disabledBackground: 'rgba(255, 255, 255, 0.12)',
+    },
   },
   components: {
     MuiPaper: {
       styleOverrides: {
         root: {
           boxShadow: '0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#2d2d2d',
+        },
+      },
+    },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: '#252525',
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#2d2d2d',
         },
       },
     },
   },
 });
 
-export const CustomThemeProvider = ({ children }: { children: React.ReactNode }) => {
+interface CustomThemeProviderProps {
+  children: React.ReactNode;
+}
+
+export const CustomThemeProvider: React.FC<CustomThemeProviderProps> = ({ children }) => {
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
   const [mode, setMode] = useState<ThemeMode>(() => {
-    const savedMode = localStorage.getItem("theme") as ThemeMode;
+    const savedMode = localStorage.getItem("theme") as ThemeMode | null;
     return savedMode || (prefersDarkMode ? "dark" : "light");
   });
 
@@ -174,8 +219,13 @@ export const CustomThemeProvider = ({ children }: { children: React.ReactNode })
     return mode === 'light' ? lightTheme : darkTheme;
   }, [mode]);
 
+  const contextValue = useMemo(() => ({
+    toggleTheme,
+    mode,
+  }), [mode]);
+
   return (
-    <ThemeModeContext.Provider value={{ toggleTheme, mode }}>
+    <ThemeModeContext.Provider value={contextValue}>
       <ThemeProvider theme={theme}>
         <CssBaseline enableColorScheme />
         {children}

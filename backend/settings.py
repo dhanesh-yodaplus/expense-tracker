@@ -165,3 +165,14 @@ CORS_ALLOW_ALL_ORIGINS = True
 # CORS_ALLOWED_ORIGINS = [
 #     "http://localhost:5173",  # React dev server
 # ]
+
+
+# For Development Only: Simulate email sending
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# Optional but recommended
+DEFAULT_FROM_EMAIL = "noreply@expensetracker.com"
+
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'

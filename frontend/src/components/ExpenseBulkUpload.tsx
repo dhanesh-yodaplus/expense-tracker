@@ -14,7 +14,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  Chip,
   useTheme,
 } from "@mui/material";
 import axiosInstance from "../services/axios";

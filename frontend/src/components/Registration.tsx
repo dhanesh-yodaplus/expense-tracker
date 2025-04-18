@@ -83,8 +83,8 @@ export default function Register() {
         confirm_password: data.confirm_password,
       });
 
-      toast.success("Registration successful! Redirecting to login...");
-      setTimeout(() => navigate("/"), 1500);
+      toast.success("Registration successful! Please verify email with OTP...");
+      setTimeout(() => navigate("/verify-email", { state: { email: data.email } }), 1500);
     } catch (err: any) {
       const errorMessage = err.response?.data?.email?.[0] || 
                          err.response?.data?.username?.[0] || 

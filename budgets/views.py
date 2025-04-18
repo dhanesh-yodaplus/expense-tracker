@@ -6,7 +6,7 @@ from datetime import datetime
 from .models import Budget, MonthlyBudget
 from .serializers import BudgetSerializer, MonthlyBudgetSerializer
 from expenses.models import Expense
-
+from incomes.models import Income
 
 class BudgetViewSet(viewsets.ModelViewSet):
     """
@@ -99,6 +99,54 @@ class BudgetViewSet(viewsets.ModelViewSet):
         budgets = Budget.objects.filter(user=request.user, month=month_start)
         serializer = BudgetSerializer(budgets, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='analytics')
+    def get_analytics(self, request):
+        """
+        Returns high-level analytics for the selected month:
+        - total budget, total spent, total income
+        - savings (income - spent)
+        - top 3 over-budget categories
+        """
+        user = request.user
+        month_param = request.query_params.get("month")
+
+        try:
+            if month_param:
+                month_start = datetime.strptime(month_param, "%Y-%m").date().replace(day=1)
+            else:
+                month_start = datetime.today().replace(day=1)
+        except ValueError:
+            return Response({"error": "Invalid month format. Use YYYY-MM."}, status=400)
+
+        budgets = Budget.objects.filter(user=user, month=month_start)
+        expenses = Expense.objects.filter(user=user, date__year=month_start.year, date__month=month_start.month)
+        incomes = Income.objects.filter(user=user, date__year=month_start.year, date__month=month_start.month)
+
+        total_budget = budgets.aggregate(total=Sum('amount'))['total'] or 0
+        total_expense = expenses.aggregate(total=Sum('amount'))['total'] or 0
+        total_income = incomes.aggregate(total=Sum('amount'))['total'] or 0
+
+        over_budget = []
+        for budget in budgets:
+            cat_exp = expenses.filter(category=budget.category).aggregate(sum=Sum('amount'))['sum'] or 0
+            if cat_exp > budget.amount:
+                over_budget.append({
+                    "category": budget.category.name,
+                    "budget": float(budget.amount),
+                    "spent": float(cat_exp),
+                    "excess": float(cat_exp - budget.amount)
+                })
+
+        top_over_budget = sorted(over_budget, key=lambda x: x['excess'], reverse=True)[:3]
+
+        return Response({
+            "total_budget": float(total_budget),
+            "total_spent": float(total_expense),
+            "total_income": float(total_income),
+            "savings": float(total_income - total_expense),
+            "top_over_budget_categories": top_over_budget,
+        })
 
 
 class MonthlyBudgetViewSet(viewsets.ModelViewSet):

@@ -1,12 +1,20 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from .models import Expense
+from incomes.models import Income
 from .serializers import ExpenseSerializer
 import csv
 import io
 from rest_framework.views import APIView
 from django.db import transaction
 from categories.models import Category
+from rest_framework.decorators import api_view, permission_classes
+from datetime import datetime
+from django.db.models import Sum
+import calendar
+from dateutil.relativedelta import relativedelta
+from django.utils.timezone import now
+
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     """
@@ -30,7 +38,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         """
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            print("Validation errors:", serializer.errors)  # Logs specific field errors
+            print("Validation errors:", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         serializer.save(user=request.user)
@@ -38,6 +46,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
 
 class ExpenseBulkUploadView(APIView):
+    """
+    API view to handle CSV bulk upload of expenses.
+    """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
@@ -54,10 +65,9 @@ class ExpenseBulkUploadView(APIView):
         errors = []
 
         with transaction.atomic():
-            for i, row in enumerate(reader, start=2):  # start=2 to account for header row
+            for i, row in enumerate(reader, start=2):
                 row_errors = []
 
-                # Check for missing fields
                 if not required_fields.issubset(row.keys()):
                     return Response({"error": "CSV header must include title, amount, date, category"}, status=400)
 
@@ -83,7 +93,6 @@ class ExpenseBulkUploadView(APIView):
                     errors.append({"row": i, "errors": row_errors})
                     continue
 
-                # Create expense
                 Expense.objects.create(
                     title=title,
                     amount=int(amount),
@@ -98,3 +107,107 @@ class ExpenseBulkUploadView(APIView):
             {"success_count": success_count, "errors": errors},
             status=status.HTTP_200_OK
         )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def summary_by_category(request):
+    """
+    Returns total expenses grouped by category for the selected month.
+    Query param: ?month=YYYY-MM
+    """
+    month_param = request.query_params.get("month")
+    if not month_param:
+        return Response({"error": "Month is required (YYYY-MM)"}, status=400)
+
+    try:
+        month_date = datetime.strptime(month_param, "%Y-%m").date()
+    except ValueError:
+        return Response({"error": "Invalid month format. Use YYYY-MM."}, status=400)
+
+    expenses = Expense.objects.filter(
+        user=request.user,
+        date__year=month_date.year,
+        date__month=month_date.month
+    )
+
+    summary = (
+        expenses.values("category__name")
+        .annotate(total=Sum("amount"))
+        .order_by("-total")
+    )
+
+    formatted = [
+        {"category": item["category__name"], "total": float(item["total"])}
+        for item in summary
+    ]
+
+    return Response(formatted)
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def monthly_expense_summary(request):
+    """
+    Returns total expense per month for the last 6 months.
+    Used for bar chart visualization.
+    """
+    from django.utils.timezone import now
+    from dateutil.relativedelta import relativedelta
+
+    user = request.user
+    today = now().date()
+    summary = []
+
+    # Iterate through the last 6 months
+    for i in range(6):
+        month_date = today - relativedelta(months=i)
+        total = Expense.objects.filter(
+            user=user,
+            date__year=month_date.year,
+            date__month=month_date.month
+        ).aggregate(sum=Sum("amount"))["sum"] or 0
+
+        summary.append({
+            "month": month_date.strftime("%Y-%m"),
+            "total": float(total)
+        })
+
+    # Sort months from oldest to latest
+    summary = sorted(summary, key=lambda x: x["month"])
+    return Response(summary)
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def income_vs_expense_summary(request):
+    """
+    Returns income and expense totals per month (last 6 months) for line chart.
+    """
+    user = request.user
+    today = now().date()
+    summary = []
+
+    for i in range(6):
+        month_date = today - relativedelta(months=i)
+        month_label = calendar.month_abbr[month_date.month] + f" {month_date.year}"
+
+        income_total = Income.objects.filter(
+            user=user,
+            date__year=month_date.year,
+            date__month=month_date.month
+        ).aggregate(sum=Sum("amount"))["sum"] or 0
+
+        expense_total = Expense.objects.filter(
+            user=user,
+            date__year=month_date.year,
+            date__month=month_date.month
+        ).aggregate(sum=Sum("amount"))["sum"] or 0
+
+        summary.append({
+            "month": month_label,
+            "income": float(income_total),
+            "expense": float(expense_total),
+        })
+
+    # Sort by date ascending
+    summary = sorted(summary, key=lambda x: datetime.strptime(x["month"], "%b %Y"))
+    return Response(summary)

@@ -12,3 +12,7 @@ class MonthlyBudgetAdmin(admin.ModelAdmin):
     list_display = ('user', 'month', 'amount')
     list_filter = ('month',)
     search_fields = ('user__email',)
+
+
+
+

@@ -362,7 +362,7 @@ import {
   Box,
   IconButton,
   Divider,
-  useTheme,
+//   useTheme,
   Chip,
   CircularProgress,
   InputAdornment,
@@ -393,7 +393,7 @@ export default function BudgetForm({
   onClose,
   onSuccess,
 }: BudgetFormProps): JSX.Element {
-  const theme = useTheme();
+//   const theme = useTheme();
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryBudgets, setCategoryBudgets] = useState<Record<number, number>>({});
   const [existingBudgets, setExistingBudgets] = useState<Record<number, ExistingBudget>>({});

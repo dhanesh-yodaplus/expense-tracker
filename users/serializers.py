@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework.exceptions import AuthenticationFailed
+from .models import OneTimePassword
+from django.utils import timezone
 
-# Get the custom user model defined in settings.AUTH_USER_MODEL
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
@@ -13,7 +14,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'role']
+        fields = ['id', 'email', 'username', 'role', 'is_active', 'email_verified_at']
+        read_only_fields = ['is_active', 'email_verified_at']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -62,6 +64,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             role='user',
+            is_active=False  # ✅ Mark new users as inactive until OTP verification
         )
         return user
 
@@ -76,16 +79,46 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField()
 
     def validate(self, data):
-        """
-        Validates provided credentials using Django's authenticate().
-        Returns user info on success or raises AuthenticationFailed on failure.
-        """
         user = authenticate(email=data['email'], password=data['password'])
+
         if not user:
             raise AuthenticationFailed("Invalid credentials or user does not exist.")
+        if not user.is_active:
+            raise AuthenticationFailed("Email not verified. Please check your inbox.")
 
         return {
             'email': user.email,
             'username': user.username,
             'role': user.role,
         }
+class EmailVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6)
+
+    def validate(self, data):
+        email = data.get("email")
+        otp = data.get("otp")
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"email": "User does not exist."})
+
+        try:
+            otp_obj = OneTimePassword.objects.filter(
+                user=user,
+                is_used=False
+            ).latest("created_at")
+        except OneTimePassword.DoesNotExist:
+            raise serializers.ValidationError({"otp": "No valid OTP found."})
+
+        if otp_obj.is_expired():
+            raise serializers.ValidationError({"otp": "OTP has expired."})
+
+        if str(otp_obj.otp) != str(otp):  # 🔐 Match safely
+            raise serializers.ValidationError({"otp": "The entered OTP is incorrect."})
+
+        # Save validated objects for view use
+        data["user"] = user
+        data["otp_obj"] = otp_obj
+        return data
