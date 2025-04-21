@@ -3,10 +3,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Sum
 from datetime import datetime
-from .models import Budget, MonthlyBudget
+from .models import Budget, MonthlyBudget,PendingBudgetUpdate
 from .serializers import BudgetSerializer, MonthlyBudgetSerializer
 from expenses.models import Expense
 from incomes.models import Income
+from users.tasks import send_budget_alert_email
+import uuid
+from rest_framework.decorators import api_view, permission_classes
 
 class BudgetViewSet(viewsets.ModelViewSet):
     """
@@ -147,6 +150,45 @@ class BudgetViewSet(viewsets.ModelViewSet):
             "savings": float(total_income - total_expense),
             "top_over_budget_categories": top_over_budget,
         })
+    
+    def update(self, request, *args, **kwargs):
+        budget_instance = self.get_object()
+        new_amount = request.data.get("amount")
+
+        if not new_amount:
+            return Response({"detail": "Amount is required."}, status=400)
+
+        # Create secure token
+        token = uuid.uuid4().hex
+
+        # Save to pending table
+        pending = PendingBudgetUpdate.objects.create(
+            user=request.user,
+            original_budget=budget_instance,
+            proposed_amount=new_amount,
+            token=token
+        )
+
+        # Generate confirm and deny URLs
+        confirm_url = f"http://localhost:8000/api/budgets/confirm/{token}/"
+        deny_url = f"http://localhost:8000/api/budgets/reject/{token}/"
+
+        subject = "📝 Confirm Your Budget Update"
+        message = (
+            f"A budget update was requested for '{budget_instance.category.name}' in {budget_instance.month.strftime('%B')}.\n\n"
+            f"New Amount: ₹{new_amount}\n\n"
+            f"✅ Confirm: {confirm_url}\n"
+            f"❌ Deny: {deny_url}\n\n"
+            "This link will expire in 30 minutes."
+        )
+
+        send_budget_alert_email.delay(request.user.email, subject, message)
+
+        return Response({
+            "message": "Budget update pending. Please confirm via email.",
+            "token": token
+        }, status=202)
+
 
 
 class MonthlyBudgetViewSet(viewsets.ModelViewSet):
@@ -164,3 +206,40 @@ class MonthlyBudgetViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+from rest_framework.decorators import api_view
+from django.shortcuts import get_object_or_404
+from rest_framework.response import Response
+from .models import PendingBudgetUpdate
+from rest_framework import status
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])  
+def confirm_budget_update(request, token):
+    pending = get_object_or_404(PendingBudgetUpdate, token=token)
+
+    if pending.is_expired():
+        pending.delete()
+        return Response({"detail": "Link expired. Budget update cancelled."}, status=400)
+
+    if pending.is_confirmed:
+        return Response({"detail": "This update has already been confirmed."}, status=200)
+
+    budget = pending.original_budget
+    budget.amount = pending.proposed_amount
+    budget.save()
+
+    pending.is_confirmed = True
+    pending.save()
+
+    return Response({"detail": "✅ Budget update confirmed successfully!"}, status=200)
+
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])  
+def reject_budget_update(request, token):
+    pending = get_object_or_404(PendingBudgetUpdate, token=token)
+
+    pending.delete()
+    return Response({"detail": "❌ Budget update has been rejected and discarded."}, status=200)

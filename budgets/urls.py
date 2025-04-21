@@ -1,5 +1,11 @@
 from rest_framework.routers import DefaultRouter
-from .views import BudgetViewSet,MonthlyBudgetViewSet
+from .views import (
+    BudgetViewSet,
+    MonthlyBudgetViewSet,
+    confirm_budget_update,
+    reject_budget_update,
+)
+from django.urls import path
 
 router = DefaultRouter()
 
@@ -9,5 +15,8 @@ router.register(r'monthlybudgets', MonthlyBudgetViewSet, basename='monthly-budge
 # Then register the general budget viewset
 router.register(r'', BudgetViewSet, basename='budget')
 
-
-urlpatterns = router.urls
+# Add token-based confirmation endpoints
+urlpatterns = router.urls + [
+    path('confirm/<str:token>/', confirm_budget_update, name='confirm-budget'),
+    path('reject/<str:token>/', reject_budget_update, name='reject-budget'),
+]

@@ -11,9 +11,11 @@ import {
   Box,
   Stack,
   IconButton,
-  Tooltip,
   useTheme,
   useMediaQuery,
+  AppBar,
+  Toolbar,
+  Button,
 } from "@mui/material";
 import {
   Visibility,
@@ -25,8 +27,11 @@ import {
   TrendingUp,
   CloudUpload,
   BarChart,
+  Brightness4,
+  Brightness7,
 } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { useThemeMode } from "../components/ThemeContext";
 import VisualInsights from "./VisualInsights";
 import BarChartIcon from "@mui/icons-material/BarChart";
 
@@ -53,6 +58,7 @@ export default function Dashboard(): JSX.Element {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
+  const { mode, toggleTheme } = useThemeMode();
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
@@ -125,24 +131,13 @@ export default function Dashboard(): JSX.Element {
   );
 
   return (
-    <Container
-      maxWidth="xl"
-      sx={{
-        mt: isMobile ? 2 : 4,
-        mb: 6,
-        px: isMobile ? 2 : 4,
-      }}
-    >
-      {/* Top Bar */}
+    <>
 
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems={isMobile ? "flex-start" : "center"}
-        mb={isMobile ? 3 : 6}
-        flexDirection={isMobile ? "column" : "row"}
+      <Container
+        maxWidth="xl"
+        sx={{ mt: isMobile ? 2 : 4, mb: 6, px: isMobile ? 2 : 4 }}
       >
-        <Box mb={isMobile ? 2 : 0}>
+        <Box mb={isMobile ? 3 : 6}>
           <Typography variant="h4" gutterBottom sx={{ fontWeight: 700 }}>
             Financial Dashboard
           </Typography>
@@ -150,325 +145,305 @@ export default function Dashboard(): JSX.Element {
             Comprehensive overview of your financial health
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
-          {/* <Tooltip title="Toggle Theme">
-            <IconButton color="inherit" sx={{ border: `1px solid ${theme.palette.divider}` }}>
-              <Brightness7 />
-            </IconButton>
-          </Tooltip> */}
-          <Tooltip title="Logout">
-            <IconButton
-              color="inherit"
-              onClick={handleLogout}
-              sx={{
-                border: `1px solid ${theme.palette.divider}`,
-                color: theme.palette.error.main,
-              }}
-            >
-              <Logout />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Box>
 
-      {/* Dashboard Cards */}
-      <Grid container spacing={3}>
-        {renderCard(
-          "Add Expense",
-          <Receipt color="primary" />,
-          () => setOpenAdd(true),
-          theme.palette.primary.main
-        )}
-        {renderCard(
-          "Add Income",
-          <TrendingUp color="success" />,
-          () => setOpenAddIncome(true),
-          theme.palette.success.main
-        )}
-        {renderCard(
-          "Set Budget",
-          <PieChart color="secondary" />,
-          () => setOpenBudgetForm(true),
-          theme.palette.secondary.main
-        )}
-        {renderCard(
-          "Expense Report",
-          <Visibility color="info" />,
-          () => setOpenViewExpenses(true),
-          theme.palette.info.main
-        )}
-        {renderCard(
-          "Income Report",
-          <MonetizationOn color="warning" />,
-          () => setOpenViewIncomes(true),
-          theme.palette.warning.main
-        )}
-        {renderCard(
-          "Budget Summary",
-          <Savings color="primary" />,
-          () => setOpenBudgetSummary(true),
-          theme.palette.primary.main
-        )}
-        {renderCard(
-          "Bulk Upload",
-          <CloudUpload color="inherit" />,
-          () => setOpenBulkUpload(true),
-          theme.palette.text.secondary
-        )}
-        {renderCard(
-          "Budget Insights",
-          <BarChart color="secondary" />,
-          () => setOpenBudgetAnalytics(true), // new state trigger
-          theme.palette.secondary.main
-        )}
-        {renderCard(
-          "Visual Insights",
-          <BarChartIcon color="info" />,
-          () => setOpenVisualInsights(true),
-          theme.palette.info.main
-        )}
-      </Grid>
+        <Grid container spacing={3}>
+          {renderCard(
+            "Add Expense",
+            <Receipt color="primary" />,
+            () => setOpenAdd(true),
+            theme.palette.primary.main
+          )}
+          {renderCard(
+            "Add Income",
+            <TrendingUp color="success" />,
+            () => setOpenAddIncome(true),
+            theme.palette.success.main
+          )}
+          {renderCard(
+            "Set Budget",
+            <PieChart color="secondary" />,
+            () => setOpenBudgetForm(true),
+            theme.palette.secondary.main
+          )}
+          {renderCard(
+            "Expense Report",
+            <Visibility color="info" />,
+            () => setOpenViewExpenses(true),
+            theme.palette.info.main
+          )}
+          {renderCard(
+            "Income Report",
+            <MonetizationOn color="warning" />,
+            () => setOpenViewIncomes(true),
+            theme.palette.warning.main
+          )}
+          {renderCard(
+            "Budget Summary",
+            <Savings color="primary" />,
+            () => setOpenBudgetSummary(true),
+            theme.palette.primary.main
+          )}
+          {renderCard(
+            "Bulk Upload",
+            <CloudUpload color="inherit" />,
+            () => setOpenBulkUpload(true),
+            theme.palette.text.secondary
+          )}
+          {renderCard(
+            "Budget Insights",
+            <BarChart color="secondary" />,
+            () => setOpenBudgetAnalytics(true),
+            theme.palette.secondary.main
+          )}
+          {renderCard(
+            "Visual Insights",
+            <BarChartIcon color="info" />,
+            () => setOpenVisualInsights(true),
+            theme.palette.info.main
+          )}
+        </Grid>
+        <Dialog
+          open={openAdd}
+          onClose={() => setOpenAdd(false)}
+          fullWidth
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              background: theme.palette.background.paper,
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              py: 2,
+            }}
+          >
+            Record New Expense
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <AddExpenseForm onClose={() => setOpenAdd(false)} />
+          </DialogContent>
+        </Dialog>
 
-      {/* Dialogs */}
-      <Dialog
-        open={openAdd}
-        onClose={() => setOpenAdd(false)}
-        fullWidth
-        maxWidth="sm"
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: theme.palette.background.paper,
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 600,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            py: 2,
+        <Dialog
+          open={openAddIncome}
+          onClose={() => setOpenAddIncome(false)}
+          fullWidth
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              background: theme.palette.background.paper,
+            },
           }}
         >
-          Record New Expense
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <AddExpenseForm onClose={() => setOpenAdd(false)} />
-        </DialogContent>
-      </Dialog>
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              py: 2,
+            }}
+          >
+            Record New Income
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <AddIncomeForm onClose={() => setOpenAddIncome(false)} />
+          </DialogContent>
+        </Dialog>
 
-      <Dialog
-        open={openAddIncome}
-        onClose={() => setOpenAddIncome(false)}
-        fullWidth
-        maxWidth="sm"
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: theme.palette.background.paper,
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 600,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            py: 2,
+        <Dialog
+          open={openBudgetForm}
+          onClose={() => setOpenBudgetForm(false)}
+          fullWidth
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              background: theme.palette.background.paper,
+            },
           }}
         >
-          Record New Income
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <AddIncomeForm onClose={() => setOpenAddIncome(false)} />
-        </DialogContent>
-      </Dialog>
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              py: 2,
+            }}
+          >
+            Configure Budget
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <BudgetForm
+              open={openBudgetForm}
+              onClose={() => setOpenBudgetForm(false)}
+              initialData={null}
+              onSuccess={() => setOpenBudgetForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
 
-      <Dialog
-        open={openBudgetForm}
-        onClose={() => setOpenBudgetForm(false)}
-        fullWidth
-        maxWidth="sm"
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: theme.palette.background.paper,
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 600,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            py: 2,
+        <Dialog
+          open={openViewExpenses}
+          onClose={() => setOpenViewExpenses(false)}
+          fullWidth
+          maxWidth="lg"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              background: theme.palette.background.paper,
+              height: "80vh",
+            },
           }}
         >
-          Configure Budget
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <BudgetForm
-            open={openBudgetForm}
-            onClose={() => setOpenBudgetForm(false)}
-            initialData={null}
-            onSuccess={() => setOpenBudgetForm(false)}
-          />
-        </DialogContent>
-      </Dialog>
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              py: 2,
+            }}
+          >
+            Expense Transactions
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <ExpenseList />
+          </DialogContent>
+        </Dialog>
 
-      <Dialog
-        open={openViewExpenses}
-        onClose={() => setOpenViewExpenses(false)}
-        fullWidth
-        maxWidth="lg"
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: theme.palette.background.paper,
-            height: "80vh",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 600,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            py: 2,
+        <Dialog
+          open={openViewIncomes}
+          onClose={() => setOpenViewIncomes(false)}
+          fullWidth
+          maxWidth="lg"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              background: theme.palette.background.paper,
+              height: "80vh",
+            },
           }}
         >
-          Expense Transactions
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <ExpenseList />
-        </DialogContent>
-      </Dialog>
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              py: 2,
+            }}
+          >
+            Income Transactions
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <IncomeList />
+          </DialogContent>
+        </Dialog>
 
-      <Dialog
-        open={openViewIncomes}
-        onClose={() => setOpenViewIncomes(false)}
-        fullWidth
-        maxWidth="lg"
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: theme.palette.background.paper,
-            height: "80vh",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 600,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            py: 2,
+        <Dialog
+          open={openBulkUpload}
+          onClose={() => setOpenBulkUpload(false)}
+          fullWidth
+          maxWidth="md"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              background: theme.palette.background.paper,
+            },
           }}
         >
-          Income Transactions
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <IncomeList />
-        </DialogContent>
-      </Dialog>
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              py: 2,
+            }}
+          >
+            Bulk Expense Upload
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <ExpenseBulkUpload onClose={() => setOpenBulkUpload(false)} />
+          </DialogContent>
+        </Dialog>
 
-      <Dialog
-        open={openBulkUpload}
-        onClose={() => setOpenBulkUpload(false)}
-        fullWidth
-        maxWidth="md"
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: theme.palette.background.paper,
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 600,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            py: 2,
+        <Dialog
+          open={openBudgetSummary}
+          onClose={() => setOpenBudgetSummary(false)}
+          fullWidth
+          maxWidth="lg"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              background: theme.palette.background.paper,
+              height: "80vh",
+            },
           }}
         >
-          Bulk Expense Upload
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <ExpenseBulkUpload onClose={() => setOpenBulkUpload(false)} />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={openBudgetSummary}
-        onClose={() => setOpenBudgetSummary(false)}
-        fullWidth
-        maxWidth="lg"
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: theme.palette.background.paper,
-            height: "80vh",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 600,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            py: 2,
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              py: 2,
+            }}
+          >
+            Budget Performance
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <BudgetSummary />
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={openBudgetAnalytics}
+          onClose={() => setOpenBudgetAnalytics(false)}
+          fullWidth
+          maxWidth="md"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              background: theme.palette.background.paper,
+            },
           }}
         >
-          Budget Performance
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <BudgetSummary />
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={openBudgetAnalytics}
-        onClose={() => setOpenBudgetAnalytics(false)}
-        fullWidth
-        maxWidth="md"
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: theme.palette.background.paper,
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 600,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            py: 2,
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              py: 2,
+            }}
+          >
+            Monthly Budget Insights
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <BudgetAnalyticsCard />
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={openVisualInsights}
+          onClose={() => setOpenVisualInsights(false)}
+          fullWidth
+          maxWidth="md"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              background: theme.palette.background.paper,
+            },
           }}
         >
-          Monthly Budget Insights
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <BudgetAnalyticsCard />
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={openVisualInsights}
-        onClose={() => setOpenVisualInsights(false)}
-        fullWidth
-        maxWidth="md"
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: theme.palette.background.paper,
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 600,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            py: 2,
-          }}
-        >
-          Visual Insights – Charts by Category
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <VisualInsights />
-        </DialogContent>
-      </Dialog>
-    </Container>
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              py: 2,
+            }}
+          >
+            Visual Insights – Charts by Category
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <VisualInsights />
+          </DialogContent>
+        </Dialog>
+      </Container>
+    </>
   );
 }
+
+

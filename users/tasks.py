@@ -10,7 +10,16 @@ def send_otp_email(email, otp):
     """
     subject = "Verify Your Email - Expense Tracker"
     message = f"Your OTP for email verification is: {otp}"
-    from_email = "noreply@expensetracker.com"  # Or use settings.DEFAULT_FROM_EMAIL
+    from_email = "noreply@expensetracker.com"
     recipient_list = [email]
 
     send_mail(subject, message, from_email, recipient_list)
+
+@shared_task
+def send_budget_alert_email(email, subject, message):
+    send_mail(
+        subject,
+        message,
+        "noreply@expensetracker.com",   
+        [email]
+    )

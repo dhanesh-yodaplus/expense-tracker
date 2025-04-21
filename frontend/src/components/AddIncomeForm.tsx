@@ -12,6 +12,9 @@ import {
   InputAdornment,
   Stack,
   useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
 } from "@mui/material";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -27,21 +30,12 @@ import {
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 
-// Enhanced validation schema
 const schema = z.object({
-  title: z.string()
-    .min(1, "Title is required")
-    .max(50, "Title cannot exceed 50 characters"),
-  amount: z.number()
-    .positive("Amount must be greater than 0")
-    .max(10000000, "Amount seems too large"),
-  date: z.string()
-    .min(1, "Date is required")
-    .refine(date => dayjs(date).isValid(), "Invalid date format"),
+  title: z.string().min(1, "Title is required").max(50, "Title cannot exceed 50 characters"),
+  amount: z.number().positive("Amount must be greater than 0").max(10000000, "Amount seems too large"),
+  date: z.string().min(1, "Date is required").refine(date => dayjs(date).isValid(), "Invalid date format"),
   category: z.string().min(1, "Category is required"),
-  notes: z.string()
-    .max(200, "Notes cannot exceed 200 characters")
-    .optional(),
+  notes: z.string().max(200, "Notes cannot exceed 200 characters").optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -81,6 +75,8 @@ export default function AddIncomeForm({ onClose, onSuccess }: AddIncomeFormProps
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [salaryExists, setSalaryExists] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const amountValue = watch("amount");
 
@@ -103,7 +99,42 @@ export default function AddIncomeForm({ onClose, onSuccess }: AddIncomeFormProps
     fetchCategories();
   }, [setValue]);
 
-  const onSubmit = async (data: FormData) => {
+  useEffect(() => {
+    const selectedCategory = categories.find(
+      (cat) => cat.id.toString() === watch("category")
+    );
+
+    if (selectedCategory?.name.toLowerCase() === "salary") {
+      const selectedMonth = dayjs(watch("date")).format("YYYY-MM");
+
+      axiosInstance
+        .get(`/incomes/check-salary-exists/?month=${selectedMonth}`)
+        .then((res) => {
+          setSalaryExists(res.data.exists);
+        })
+        .catch((err) => {
+          console.error("Salary check failed:", err);
+        });
+    } else {
+      setSalaryExists(false);
+    }
+  }, [watch("date"), watch("category"), categories]);
+
+  const handleIncomeSubmit = async (data: FormData & { _shouldClose?: boolean }) => {
+    const selectedCategory = categories.find(
+      (cat) => cat.id.toString() === data.category
+    );
+
+    const shouldClose = data._shouldClose !== false;
+
+    if (selectedCategory?.name.toLowerCase() === "salary" && salaryExists) {
+      setShowConfirm(true);
+    } else {
+      await submitIncome(data, shouldClose);
+    }
+  };
+
+  const submitIncome = async (data: FormData, shouldClose: boolean) => {
     setSubmitting(true);
     setError(null);
 
@@ -120,10 +151,15 @@ export default function AddIncomeForm({ onClose, onSuccess }: AddIncomeFormProps
       setSuccess(true);
       reset();
       onSuccess?.();
-      setTimeout(() => {
-        setSuccess(false);
-        onClose();
-      }, 1500);
+
+      if (shouldClose) {
+        setTimeout(() => {
+          setSuccess(false);
+          onClose();
+        }, 1500);
+      } else {
+        setTimeout(() => setSuccess(false), 2000);
+      }
     } catch (err) {
       console.error("Submission error:", err);
       setError("Failed to add income. Please try again.");
@@ -133,46 +169,12 @@ export default function AddIncomeForm({ onClose, onSuccess }: AddIncomeFormProps
   };
 
   return (
-    <Card
-      elevation={3}
-      sx={{
-        width: '100%',
-        maxWidth: 500,
-        mx: 'auto',
-        p: 0,
-        borderRadius: 2,
-        overflow: 'hidden'
-      }}
-    >
-      {/* Header Section */}
-      <Box
-        sx={{
-          backgroundColor: theme.palette.primary.main,
-          color: theme.palette.primary.contrastText,
-          p: 2,
-        }}
-      >
-        <Typography variant="h6" fontWeight={600}>
-          Add New Income
-        </Typography>
-      </Box>
-
-      {/* Form Content */}
+    <Card elevation={3} sx={{ width: '100%', maxWidth: 500, mx: 'auto', p: 0, borderRadius: 2, overflow: 'hidden' }}>
       <CardContent>
-        <Stack spacing={3} component="form" onSubmit={handleSubmit(onSubmit)}>
-          {/* Status Alerts */}
-          {success && (
-            <Alert severity="success" onClose={() => setSuccess(false)}>
-              Income added successfully!
-            </Alert>
-          )}
-          {error && (
-            <Alert severity="error" onClose={() => setError(null)}>
-              {error}
-            </Alert>
-          )}
+        <Stack spacing={3} component="form" onSubmit={handleSubmit((data) => handleIncomeSubmit({ ...data, _shouldClose: true }))}>
+          {success && <Alert severity="success" onClose={() => setSuccess(false)}>Income added successfully!</Alert>}
+          {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
-          {/* Title Field */}
           <TextField
             fullWidth
             label="Income Title"
@@ -189,7 +191,6 @@ export default function AddIncomeForm({ onClose, onSuccess }: AddIncomeFormProps
             }}
           />
 
-          {/* Amount and Date Row */}
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
               fullWidth
@@ -225,17 +226,12 @@ export default function AddIncomeForm({ onClose, onSuccess }: AddIncomeFormProps
             />
           </Box>
 
-          {/* Amount Preview */}
           {amountValue > 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-              Amount: {new Intl.NumberFormat("en-IN", {
-                style: "currency",
-                currency: "INR",
-              }).format(amountValue)}
+              Amount: {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(amountValue)}
             </Typography>
           )}
 
-          {/* Category Field */}
           {loading ? (
             <Box display="flex" justifyContent="center">
               <CircularProgress size={24} />
@@ -265,7 +261,6 @@ export default function AddIncomeForm({ onClose, onSuccess }: AddIncomeFormProps
             </TextField>
           )}
 
-          {/* Notes Field */}
           <TextField
             fullWidth
             label="Notes (optional)"
@@ -277,15 +272,17 @@ export default function AddIncomeForm({ onClose, onSuccess }: AddIncomeFormProps
             helperText={errors.notes?.message}
           />
 
-          {/* Action Buttons */}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, pt: 2 }}>
-            <Button
-              variant="outlined"
-              onClick={onClose}
-              startIcon={<Close />}
-              disabled={submitting}
-            >
+            <Button variant="outlined" onClick={onClose} startIcon={<Close />} disabled={submitting}>
               Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              disabled={loading || submitting || !isDirty}
+              onClick={handleSubmit((data) => handleIncomeSubmit({ ...data, _shouldClose: false }))}
+            >
+              Save & Add Another
             </Button>
             <Button
               variant="contained"
@@ -298,6 +295,30 @@ export default function AddIncomeForm({ onClose, onSuccess }: AddIncomeFormProps
           </Box>
         </Stack>
       </CardContent>
+
+      <Dialog open={showConfirm} onClose={() => setShowConfirm(false)}>
+        <DialogTitle>Duplicate Salary Entry</DialogTitle>
+        <DialogContent>
+          <Typography>
+            A salary entry already exists for this month. Do you want to add another?
+          </Typography>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2, gap: 2 }}>
+            <Button onClick={() => setShowConfirm(false)} color="inherit" variant="outlined">
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                setShowConfirm(false);
+                await submitIncome(watch(), true);
+              }}
+              variant="contained"
+              color="primary"
+            >
+              Add Anyway
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

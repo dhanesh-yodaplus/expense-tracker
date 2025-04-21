@@ -31,4 +31,20 @@ class MonthlyBudget(models.Model):
 
     def __str__(self):
         return f"{self.user.email} | {self.month.strftime('%B %Y')} → ₹{self.amount}"
-    
+
+class PendingBudgetUpdate(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    original_budget = models.ForeignKey(Budget, on_delete=models.CASCADE)
+    proposed_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    token = models.CharField(max_length=100, unique=True)
+    is_confirmed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timezone.timedelta(minutes=30)
+
+    def __str__(self):
+        return f"Pending update for {self.original_budget} → ₹{self.proposed_amount}"
+
+
+

@@ -14,7 +14,9 @@ from django.db.models import Sum
 import calendar
 from dateutil.relativedelta import relativedelta
 from django.utils.timezone import now
-
+from budgets.models import Budget
+from datetime import datetime
+from users.tasks import send_budget_alert_email
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     """
@@ -32,17 +34,43 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         return Expense.objects.filter(user=self.request.user).order_by('-date')
 
     def create(self, request, *args, **kwargs):
-        """
-        Handles creation of a new expense entry.
-        Automatically sets the user and logs validation errors if any.
-        """
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
             print("Validation errors:", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        serializer.save(user=request.user)
+        expense = serializer.save(user=request.user)
+        user = request.user
+        category = expense.category
+        month = expense.date.replace(day=1)
+
+        # Check matching budget
+        try:
+            budget = Budget.objects.get(user=user, category=category, month=month)
+            total_spent = Expense.objects.filter(
+                user=user,
+                category=category,
+                date__year=month.year,
+                date__month=month.month
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            budget_amount = float(budget.amount)
+
+            if total_spent > budget_amount:
+                subject = "❗ Budget Overspent"
+                message = f"You have exceeded your budget for {category.name} in {month.strftime('%B')}. Limit: ₹{budget_amount}, Spent: ₹{total_spent}"
+                send_budget_alert_email.delay(user.email, subject, message)
+
+            elif total_spent >= 0.8 * budget_amount:
+                subject = "⚠️ Budget Near Limit"
+                message = f"You've spent over 80% of your {category.name} budget for {month.strftime('%B')}. Limit: ₹{budget_amount}, Spent: ₹{total_spent}"
+                send_budget_alert_email.delay(user.email, subject, message)
+
+        except Budget.DoesNotExist:
+            pass
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 
 class ExpenseBulkUploadView(APIView):

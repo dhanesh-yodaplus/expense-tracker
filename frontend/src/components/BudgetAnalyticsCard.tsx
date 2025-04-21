@@ -8,22 +8,20 @@ import {
   ListItemText,
   TextField,
   Box,
-  Grid,
   Chip,
   CircularProgress,
   useTheme,
   Paper,
-  Stack,
 } from "@mui/material";
+// import Grid from "@mui/material/Grid";
+import Grid from "../components/SafeGrid";
+import InputAdornment from "@mui/material/InputAdornment"; //  MUI adornment wrapper
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth"; //  MUI icon
 import axiosInstance from "../services/axios";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { format } from "date-fns";
 import {
-  MonetizationOn,
-  Savings,
-  TrendingUp,
-  TrendingDown,
   Warning,
   CheckCircle,
 } from "@mui/icons-material";
@@ -123,7 +121,7 @@ export default function BudgetAnalyticsCard() {
                   ...params.InputProps,
                   startAdornment: (
                     <InputAdornment position="start">
-                      <CalendarMonth color="action" />
+                      <CalendarMonthIcon color="action" />
                     </InputAdornment>
                   ),
                 }}
@@ -143,7 +141,7 @@ export default function BudgetAnalyticsCard() {
         <>
           {/* Summary Cards */}
           <Grid container spacing={2} mb={3}>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6} md={3} >
               <Paper elevation={0} sx={{ p: 2, borderRadius: 2 }}>
                 <Typography variant="subtitle2" color="text.secondary">
                   Total Budget

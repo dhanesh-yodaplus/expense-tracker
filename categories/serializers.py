@@ -9,3 +9,4 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ['id', 'name', 'type']
+        ref_name = 'CategorySerializerCategory'  # Unique name

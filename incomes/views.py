@@ -6,6 +6,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Sum
 from datetime import datetime
+from rest_framework.views import APIView
+
 
 class IncomeViewSet(viewsets.ModelViewSet):
     serializer_class = IncomeSerializer
@@ -45,3 +47,29 @@ def monthly_income_summary(request):
     return Response({
         "total_income": round(float(total_income), 2)
     }, status=status.HTTP_200_OK)
+
+
+class SalaryCheckAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        month_str = request.query_params.get("month")
+
+        if not month_str:
+            return Response({"error": "Month parameter is required"}, status=400)
+
+        try:
+            selected_month = datetime.strptime(month_str, "%Y-%m")
+        except ValueError:
+            return Response({"error": "Invalid month format. Use YYYY-MM"}, status=400)
+
+        # Filter by same month/year and category "Salary"
+        salary_exists = Income.objects.filter(
+            user=user,
+            category__name__iexact="Salary",
+            date__year=selected_month.year,
+            date__month=selected_month.month
+        ).exists()
+
+        return Response({"exists": salary_exists})

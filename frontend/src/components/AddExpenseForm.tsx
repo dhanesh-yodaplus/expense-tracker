@@ -28,19 +28,20 @@ import {
 import dayjs from "dayjs";
 
 const schema = z.object({
-  title: z.string()
+  title: z
+    .string()
     .min(1, "Title is required")
     .max(50, "Title cannot exceed 50 characters"),
-  amount: z.number()
+  amount: z
+    .number()
     .positive("Amount must be greater than 0")
     .max(10000000, "Amount seems too large"),
-  date: z.string()
+  date: z
+    .string()
     .min(1, "Date is required")
-    .refine(date => dayjs(date).isValid(), "Invalid date format"),
+    .refine((date) => dayjs(date).isValid(), "Invalid date format"),
   category: z.string().min(1, "Category is required"),
-  notes: z.string()
-    .max(200, "Notes cannot exceed 200 characters")
-    .optional(),
+  notes: z.string().max(200, "Notes cannot exceed 200 characters").optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -55,7 +56,10 @@ interface AddExpenseFormProps {
   onSuccess?: () => void;
 }
 
-export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormProps) {
+export default function AddExpenseForm({
+  onClose,
+  onSuccess,
+}: AddExpenseFormProps) {
   const theme = useTheme();
   const {
     register,
@@ -84,7 +88,9 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await axiosInstance.get<Category[]>("/categories/?type=expense");
+        const res = await axiosInstance.get<Category[]>(
+          "/categories/?type=expense"
+        );
         setCategories(res.data);
         if (res.data.length > 0) {
           setValue("category", res.data[0].id.toString());
@@ -100,7 +106,7 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
     fetchCategories();
   }, [setValue]);
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: FormData, shouldClose = true) => {
     setSubmitting(true);
     setError(null);
 
@@ -115,12 +121,18 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
 
       await axiosInstance.post("/expenses/", payload);
       setSuccess(true);
-      reset();
       onSuccess?.();
-      setTimeout(() => {
-        setSuccess(false);
-        onClose();
-      }, 1500);
+      reset(); // reset form for both cases
+
+      if (shouldClose) {
+        setTimeout(() => {
+          setSuccess(false);
+          onClose();
+        }, 1500);
+      } else {
+        // Show success briefly and reset
+        setTimeout(() => setSuccess(false), 2000);
+      }
     } catch (err) {
       console.error("Submission error:", err);
       setError("Failed to add expense. Please try again.");
@@ -135,16 +147,16 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
     <Card
       elevation={3}
       sx={{
-        width: '100%',
+        width: "100%",
         maxWidth: 500,
-        mx: 'auto',
+        mx: "auto",
         p: 0,
         borderRadius: 2,
-        overflow: 'hidden'
+        overflow: "hidden",
       }}
     >
       {/* Header Section */}
-      <Box
+      {/* <Box
         sx={{
           backgroundColor: theme.palette.primary.main,
           color: theme.palette.primary.contrastText,
@@ -154,11 +166,15 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
         <Typography variant="h6" fontWeight={600}>
           Add New Expense
         </Typography>
-      </Box>
+      </Box> */}
 
       {/* Form Content */}
       <CardContent>
-        <Stack spacing={3} component="form" onSubmit={handleSubmit(onSubmit)}>
+        <Stack
+          spacing={3}
+          component="form"
+          onSubmit={handleSubmit((data) => onSubmit(data, true))}
+        >
           {/* Status Alerts */}
           {success && (
             <Alert severity="success" onClose={() => setSuccess(false)}>
@@ -189,7 +205,7 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
           />
 
           {/* Amount and Date Row */}
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: "flex", gap: 2 }}>
             <TextField
               fullWidth
               label="Amount"
@@ -227,7 +243,8 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
           {/* Amount Preview */}
           {amountValue > 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-              Amount: {new Intl.NumberFormat("en-IN", {
+              Amount:{" "}
+              {new Intl.NumberFormat("en-IN", {
                 style: "currency",
                 currency: "INR",
               }).format(amountValue)}
@@ -277,7 +294,9 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
           />
 
           {/* Action Buttons */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, pt: 2 }}>
+          <Box
+            sx={{ display: "flex", justifyContent: "flex-end", gap: 2, pt: 2 }}
+          >
             <Button
               variant="outlined"
               onClick={onClose}
@@ -286,11 +305,27 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
             >
               Cancel
             </Button>
+
+            <Button
+              variant="contained"
+              color="secondary"
+              disabled={loading || submitting || !isDirty}
+              onClick={handleSubmit((data) => onSubmit(data, false))}
+            >
+              Save & Add Another
+            </Button>
+
             <Button
               variant="contained"
               type="submit"
               disabled={loading || submitting || !isDirty}
-              startIcon={submitting ? <CircularProgress size={20} color="inherit" /> : <Save />}
+              startIcon={
+                submitting ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  <Save />
+                )
+              }
             >
               {submitting ? "Processing..." : "Save Expense"}
             </Button>

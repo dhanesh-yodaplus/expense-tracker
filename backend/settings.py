@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'expenses',
     'incomes',
     'budgets',
+    "drf_yasg",
 ]
 
 MIDDLEWARE = [
@@ -154,7 +155,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=50),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "AUTH_HEADER_TYPES": ("Bearer",),
     "BLACKLIST_AFTER_ROTATION": True,
     "ROTATE_REFRESH_TOKENS": True,
@@ -168,11 +169,20 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 
 # For Development Only: Simulate email sending
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # Optional but recommended
-DEFAULT_FROM_EMAIL = "noreply@expensetracker.com"
+# DEFAULT_FROM_EMAIL = "noreply@expensetracker.com"
 
 CELERY_BROKER_URL = "redis://localhost:6379/0"
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+
+EMAIL_BACKEND = config("EMAIL_BACKEND")
+EMAIL_HOST = config("EMAIL_HOST")
+EMAIL_PORT = config("EMAIL_PORT", cast=int)
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=bool)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = config("EMAIL_HOST_USER")

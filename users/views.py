@@ -11,9 +11,9 @@ from .models import OneTimePassword
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
-    EmailVerificationSerializer,  # ✅ Added for OTP verification
+    EmailVerificationSerializer,  #  Added for OTP verification
 )
-from .tasks import send_otp_email  # ✅ Celery task to send OTP
+from .tasks import send_otp_email  #  Celery task to send OTP
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
